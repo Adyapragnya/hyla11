@@ -20,7 +20,7 @@ function Default() {
   const [selectedVessel, setSelectedVessel] = useState(null);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/get-tracked-vessels")
+    fetch("http://104.225.218.43:5000/api/get-tracked-vessels")
       .then(response => response.json())
       .then(data => {
         setVessels(data);

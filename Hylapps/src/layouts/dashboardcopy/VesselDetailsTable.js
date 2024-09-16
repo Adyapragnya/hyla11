@@ -85,7 +85,7 @@ const VesselDetailsTable = ({ highlightRow, onRowClick }) => {
   useEffect(() => {
     const fetchVessels = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/get-tracked-vessels');
+        const response = await axios.get('http://104.225.218.43:5000/api/get-tracked-vessels');
         const formattedData = response.data.map(vessel => ({
           NAME: vessel.AIS?.NAME || '',
           TYPE: vessel.SpireTransportType || '',
