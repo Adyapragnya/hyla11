@@ -9,8 +9,9 @@ import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 import Footer from "examples/Footer";
 import MyMapComponent from "./MyMapComponent";
 import VesselDetailsTable from "./VesselDetailsTable";
+import GeofenceMessage from "./GeofenceMessage";
 
-function Dashboardcopy() {
+function Geofence() {
   const [vessels, setVessels] = useState([]);
   const [error, setError] = useState(null);
   const [selectedVessel, setSelectedVessel] = useState(null);
@@ -39,7 +40,7 @@ function Dashboardcopy() {
 
   const vesselsToDisplay = selectedVessel ? [selectedVessel] : vessels;
   const center = selectedVessel ? [selectedVessel.lat, selectedVessel.lng] : calculateMapCenter();
-  const zoom = selectedVessel ? 2 : 6;
+  const zoom = selectedVessel ? 10 : 6; // Adjust zoom level
 
   useEffect(() => {
     axios
@@ -70,7 +71,6 @@ function Dashboardcopy() {
     <DashboardLayout>
       <DashboardNavbar showButton={true} dropdownOptions={destinationOptions} />
       <ArgonBox py={3}>
-        {/* Card for Map - Placed at the top */}
         <Grid container spacing={3}>
           <Grid item xs={12}>
             <Card
@@ -105,10 +105,8 @@ function Dashboardcopy() {
           </Grid>
         </Grid>
 
-        {/* Two Tables in a single row below the map */}
         <Grid container spacing={3} mt={1}>
-          {/* First Table */}
-          <Grid item xs={12} md={12}>
+          <Grid item xs={12} md={6}>
             <Card
               sx={{
                 backgroundColor: "#ffffff",
@@ -125,43 +123,12 @@ function Dashboardcopy() {
                   height: "100%",
                 }}
               >
-                <VesselDetailsTable
-                  key={refreshKey}
-                  vessels={vessels}
-                  onRowClick={handleRowClick}
-                  highlightRow={highlightRow}
-                />
+                <GeofenceMessage />
               </CardContent>
             </Card>
           </Grid>
 
-          {/* Second Table */}
-          {/* <Grid item xs={12} md={6}>
-            <Card
-              sx={{
-                backgroundColor: "#ffffff",
-                borderRadius: "17px",
-                boxShadow: 1,
-                padding: 2,
-                height: "550px",
-              }}
-            >
-              <CardContent
-                sx={{
-                  backgroundColor: "#ffffff",
-                  padding: 0,
-                  height: "100%",
-                }}
-              >
-                <VesselDetailsTable
-                  key={refreshKey + 1} // Ensure unique key for the second table
-                  vessels={vessels}
-                  onRowClick={handleRowClick}
-                  highlightRow={highlightRow}
-                />
-              </CardContent>
-            </Card>
-          </Grid> */}
+         
         </Grid>
       </ArgonBox>
       <Footer />
@@ -169,6 +136,4 @@ function Dashboardcopy() {
   );
 }
 
-export default Dashboardcopy;
-
-
+export default Geofence;

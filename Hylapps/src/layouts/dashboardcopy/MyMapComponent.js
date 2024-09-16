@@ -140,12 +140,23 @@ const MapWithMarkers = ({ vessels, selectedVessel }) => {
             <strong>IMO:</strong> {vessel.imo || 'N/A'}<br />
             <strong>Heading:</strong> {vessel.heading || 'N/A'}<br />
             <strong>ETA:</strong> {vessel.eta || 'N/A'}<br />
-            <strong>Destination:</strong> {vessel.destination || 'N/A'}
+            <strong>Destination:</strong> {vessel.destination || 'N/A'}<br />
+            
+            <div style={{ textAlign: 'right', marginTop: '8px' }}>
+              <a href={`/dashboard/${vessel.name}`} style={{ cursor: 'pointer' }}>
+                <u>++View more</u>
+              </a>
+            </div>
           </Popup>
         </Marker>
       ))}
     </>
   );
+  
+      
+      
+      
+    
 };
 
 MapWithMarkers.propTypes = {

@@ -4,6 +4,9 @@ const cors = require('cors');
 const axios = require('axios');
 const app = express();
 const port = 5000;
+const cron = require('node-cron');
+const { v4: uuidv4 } = require('uuid');
+
 
 // Middleware to handle JSON requests
 app.use(express.json());
@@ -30,6 +33,37 @@ const transporter = nodemailer.createTransport({
     }
 });
 
+
+// Define Schema and Model
+const crossingSchema = new mongoose.Schema({
+    vesselName: String,
+    geofenceName: String,
+    timestamp: Date,
+  });
+  
+  const Crossing = mongoose.model('Crossing', crossingSchema);
+  
+  // Endpoint to save crossing data
+  app.post('/api/save-crossing-data', async (req, res) => {
+    try {
+      const { vesselName, geofenceName, timestamp } = req.body;
+      const newCrossing = new Crossing({ vesselName, geofenceName, timestamp });
+      await newCrossing.save();
+      res.status(200).json({ message: 'Crossing data saved successfully' });
+    } catch (error) {
+      res.status(500).json({ error: 'Error saving crossing data' });
+    }
+  });
+  
+  // Endpoint to fetch crossing data
+  app.get('/api/get-crossing-data', async (req, res) => {
+    try {
+      const crossings = await Crossing.find({});
+      res.status(200).json(crossings);
+    } catch (error) {
+      res.status(500).json({ error: 'Error fetching crossing data' });
+    }
+  });
 
 // Define Mongoose schema and model for vessel_master collection
 const vesselSchema = new mongoose.Schema({
@@ -121,6 +155,115 @@ const trackedVesselSchema = new mongoose.Schema({
 
 const TrackedVessel = mongoose.model('vesselstrackeds', trackedVesselSchema, 'vesselstrackeds');
 
+const geofenceSchema = new mongoose.Schema({
+    geofenceName: String,
+    geofenceId: String, // Updated to match frontend
+    geofenceType: { type: String, enum: ['global', 'vessel', 'port'] },
+    date: { type: Date, default: Date.now, immutable: true },
+    remarks: String,
+    coordinates: {
+        type: [[[Number]]], // Array of arrays of arrays of numbers
+        validate: {
+            validator: function (v) {
+                // Ensure that the coordinates are in the correct format
+                return v.every(arr => Array.isArray(arr) && arr.every(coord => Array.isArray(coord) && coord.length === 2 && coord.every(num => typeof num === 'number')));
+            },
+            message: 'Coordinates must be an array of arrays of arrays of numbers'
+        }
+    }
+});
+
+
+const Geofence = mongoose.model('geofences', geofenceSchema, 'geofences');
+
+app.post('/api/add-geofence', async (req, res) => {
+    try {
+        const { geofenceName, geofenceId, geofenceType, date, remarks, coordinates } = req.body;
+        console.log(req.body);
+
+        // Convert coordinates from { lat, lng } to [lng, lat] format
+        const formattedCoordinates = coordinates.map(coord => [coord.lng, coord.lat]);
+
+        const newGeofence = new Geofence({
+            geofenceName,
+            geofenceId, // Updated to match schema
+            geofenceType,
+            date,
+            remarks,
+            coordinates: [formattedCoordinates] // Wrap in an extra array if needed
+        });
+
+        await newGeofence.save();
+        res.status(201).json({ message: 'Geofence data saved successfully' });
+    } catch (error) {
+        console.error('Error adding geofence data:', error);
+        res.status(500).json({ error: 'Error adding geofence data' });
+    }
+});
+
+
+
+
+
+// Route to get all geofences
+app.get('/api/geofences', async (req, res) => {
+    try {
+        const geofences = await Geofence.find();
+        res.status(200).json(geofences);
+    } catch (error) {
+        console.error('Error fetching geofences:', error);
+        res.status(500).json({ error: 'Error fetching geofences' });
+    }
+});
+
+
+const PolygonGeofenceSchema = new mongoose.Schema({
+    geofenceId: String,
+    geofenceName: String,
+    geofenceType: String,
+    date: String,
+    remarks: String,
+    coordinates: Array,
+    
+  });
+  
+  const PolygonGeofence = mongoose.model('PolygonGeofence', PolygonGeofenceSchema);
+  
+ // Example POST endpoint for saving polygon geofences
+app.post('/api/addpolygongeofences', async (req, res) => {
+    const { geofenceId, geofenceName, geofenceType, date, remarks, coordinates } = req.body;
+  
+    try {
+      const newGeofence = new PolygonGeofence({
+        geofenceId,
+        geofenceName,
+        geofenceType,
+        date,
+        remarks,
+        coordinates,
+      });
+  
+      await newGeofence.save();
+      res.status(201).json(newGeofence);
+    } catch (error) {
+      console.error('Error saving geofence:', error);
+      res.status(500).json({ error: 'Failed to save geofence data.' });
+    }
+  });
+  
+
+  
+  // API to fetch polygon geofences
+  app.get('/api/polygongeofences', async (req, res) => {
+    try {
+      const polygonGeofences = await PolygonGeofence.find();
+      res.json(polygonGeofences);
+    } catch (error) {
+      console.error('Error fetching polygon geofences:', error);
+      res.status(500).json({ error: 'Failed to fetch polygon geofences' });
+    }
+  });
+
 app.post('/api/add-combined-data', async (req, res) => {
     try {
         console.log('Combined Data Request Body:', req.body); // Log the request body
@@ -173,7 +316,8 @@ Thank you for choosing our services. We remain committed to ensuring the safe an
 
 With kind regards,
 
-HYLA Admin`,
+HYLA Admin
+`,
             });
         }
 
@@ -257,7 +401,54 @@ app.get('/api/ais-data', async (req, res) => {
     }
 });
 
+
+// VTExplorer API details
+const userkey = 'WS-096EE673-456A8B'; // Your VTExplorer API key
+
+// Function to check and update vessel data
+async function checkAndUpdateVesselData() {
+    try {
+        const vessels = await TrackedVessel.find(); // Get all vessels from the database
+        console.log(`Checking updates for ${vessels.length} vessels...`);
+
+        for (const vessel of vessels) {
+            const imo = vessel.AIS.IMO;
+
+            // Fetch vessel data from VTExplorer API
+            const response = await axios.get('https://api.vtexplorer.com/vessels', {
+                params: {
+                    userkey,
+                    imo,
+                    format: 'json'
+                }
+            });
+
+            const apiData = response.data[0]?.AIS;
+
+            // Check if latitude or longitude has changed
+            const updatedFields = {};
+            if (apiData && (apiData.LATITUDE !== vessel.AIS.LATITUDE || apiData.LONGITUDE !== vessel.AIS.LONGITUDE)) {
+                updatedFields['AIS.LATITUDE'] = apiData.LATITUDE;
+                updatedFields['AIS.LONGITUDE'] = apiData.LONGITUDE;
+
+                // Update MongoDB document
+                await TrackedVessel.updateOne({ _id: vessel._id }, { $set: updatedFields });
+
+                // Log the update
+                console.log(`Vessel ${vessel.AIS.NAME} (IMO: ${imo}) updated:`, updatedFields);
+            }
+        }
+    } catch (error) {
+        console.error('Error checking and updating vessel data:', error);
+    }
+}
+
+
+setInterval(checkAndUpdateVesselData, 60 * 10000); 
+
 // Start the server and listen on the specified port
 app.listen(port, () => {
     console.log(`Server running on http://localhost:${port}`);
 });
+
+
