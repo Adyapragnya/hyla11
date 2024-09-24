@@ -29,7 +29,8 @@ import ArgonTypography from "components/ArgonTypography";
 // custom styles for the NotificationItem
 import { menuItem, menuImage } from "examples/Items/NotificationItem/styles";
 
-const NotificationItem = forwardRef(({ color, image, title, date, ...rest }, ref) => (
+// Add geofenceName to props
+const NotificationItem = forwardRef(({ color, image, title, date, geofenceName, ...rest }, ref) => (
   <MenuItem {...rest} ref={ref} sx={(theme) => menuItem(theme)}>
     <ArgonBox
       width="2.25rem"
@@ -44,8 +45,9 @@ const NotificationItem = forwardRef(({ color, image, title, date, ...rest }, ref
     </ArgonBox>
     <ArgonBox>
       <ArgonTypography variant="button" textTransform="capitalize" fontWeight="regular">
-        <strong>{title[0]}</strong> {title[1]}
+        <strong>{title}</strong>
       </ArgonTypography>
+      {/* Display geofenceName */}
       <ArgonTypography
         variant="caption"
         color="secondary"
@@ -55,6 +57,11 @@ const NotificationItem = forwardRef(({ color, image, title, date, ...rest }, ref
           mt: 0.5,
         }}
       >
+        {geofenceName && (
+          <ArgonTypography variant="button" color="secondary" sx={{ mr: 1 }}>
+            <strong>{geofenceName}</strong>
+          </ArgonTypography>
+        )}
         <ArgonTypography variant="button" color="secondary">
           <Icon
             sx={{
@@ -70,6 +77,7 @@ const NotificationItem = forwardRef(({ color, image, title, date, ...rest }, ref
     </ArgonBox>
   </MenuItem>
 ));
+
 
 // Setting default values for the props of NotificationItem
 NotificationItem.defaultProps = {
@@ -92,5 +100,23 @@ NotificationItem.propTypes = {
   title: PropTypes.arrayOf(PropTypes.string).isRequired,
   date: PropTypes.string.isRequired,
 };
+
+NotificationItem.propTypes = {
+  color: PropTypes.oneOf([
+    "primary",
+    "secondary",
+    "info",
+    "success",
+    "warning",
+    "error",
+    "light",
+    "dark",
+  ]),
+  image: PropTypes.node.isRequired,
+  title: PropTypes.string.isRequired,  // Change to string
+  date: PropTypes.string.isRequired,
+  geofenceName: PropTypes.string,  // Add geofenceName prop type
+};
+
 
 export default NotificationItem;

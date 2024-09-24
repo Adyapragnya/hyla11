@@ -7,12 +7,14 @@ import IconButton from "@mui/material/IconButton";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import Icon from "@mui/material/Icon";
+import Badge from "@mui/material/Badge"; // Import Badge component
 import ArgonBox from "components/ArgonBox";
 import ArgonTypography from "components/ArgonTypography";
 import ArgonInput from "components/ArgonInput";
 import Breadcrumbs from "examples/Breadcrumbs";
 import NotificationItem from "examples/Items/NotificationItem";
 import './style.css';
+import DirectionsBoatIcon from "@mui/icons-material/DirectionsBoat";
 import {
   navbar,
   navbarContainer,
@@ -30,7 +32,8 @@ import {
 import team2 from "assets/images/team-2.jpg";
 import logoSpotify from "assets/images/small-logos/logo-spotify.svg";
 
-function DashboardNavbar({ absolute, light, isMini, showButton, dropdownOptions }) {
+function DashboardNavbar({ absolute, light, isMini, showButton, dropdownOptions, vesselEntries }) {
+  console.log(vesselEntries);
   const [navbarType, setNavbarType] = useState();
   const [controller, dispatch] = useArgonController();
   const { miniSidenav, transparentNavbar, fixedNavbar, openConfigurator } = controller;
@@ -83,36 +86,37 @@ function DashboardNavbar({ absolute, light, isMini, showButton, dropdownOptions 
     setSearchTerm(event.target.value);
   };
 
-  const renderMenu = () => (
-    <Menu
-      anchorEl={openMenu}
-      anchorReference={null}
-      anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-      open={Boolean(openMenu)}
-      onClose={handleCloseMenu}
-      sx={{ mt: 2 }}
-    >
-      <NotificationItem
-        image={<img src={team2} alt="person" />}
-        title={["New message", "from Laur"]}
-        date="13 minutes ago"
-        onClick={handleCloseMenu}
-      />
-      <NotificationItem
-        image={<img src={logoSpotify} alt="person" />}
-        title={["New album", "by Travis Scott"]}
-        date="1 day"
-        onClick={handleCloseMenu}
-      />
-      <NotificationItem
-        color="secondary"
-        image={<Icon fontSize="small" sx={{ color: ({ palette: { white } }) => white.main }}>payment</Icon>}
-        title={["", "Payment successfully completed"]}
-        date="2 days"
-        onClick={handleCloseMenu}
-      />
-    </Menu>
-  );
+  const renderMenu = () => {
+    const vesselEntriesArray = Array.isArray(vesselEntries)
+      ? vesselEntries
+      : Object.keys(vesselEntries).map((key) => ({ name: key, ...vesselEntries[key] }));
+  
+    return (
+      <Menu
+        anchorEl={openMenu}
+        anchorReference={null}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        open={Boolean(openMenu)}
+        onClose={handleCloseMenu}
+        sx={{ mt: 2 }}
+      >
+        {vesselEntriesArray.length ? (
+          vesselEntriesArray.map((vessel, index) => (
+            <NotificationItem
+              key={index}
+              image={<DirectionsBoatIcon />}  // Use ship icon here
+              title={vessel.name || "Unnamed Vessel"}
+              date={vessel.entryTime || "No entry time available"}
+              geofenceName={vessel.geofence || "No geofence name"}  // Add geofenceName
+              onClick={handleCloseMenu}
+            />
+          ))
+        ) : (
+          <MenuItem disabled>No vessels available</MenuItem>
+        )}
+      </Menu>
+    );
+  };
 
   const renderDropdown = () => (
     <Menu
@@ -127,7 +131,6 @@ function DashboardNavbar({ absolute, light, isMini, showButton, dropdownOptions 
         <ArgonInput 
           placeholder="Search..." 
           fullWidth 
-       
           onChange={handleSearchChange}
           value={searchTerm}
         />
@@ -177,50 +180,6 @@ function DashboardNavbar({ absolute, light, isMini, showButton, dropdownOptions 
           <ArgonBox sx={(theme) => navbarRow(theme, { isMini })}>
             <ArgonBox color={light ? "white" : "inherit"} display="flex" alignItems="center">
 
-
-              {/* {showButton && (
-                <label className="switch">
-                  <input type="checkbox" checked={!isGlobal} onChange={() => setIsGlobal(!isGlobal)} />
-                  <span className="slider"></span>
-                </label>
-              )}
-             
-              {!isGlobal && (
-                <IconButton
-                  size="small"
-                  color={light && transparentNavbar ? "white" : "dark"}
-                  sx={navbarIconButton}
-                  onClick={handleDropdownClick}  // This triggers the dropdown
-                >
-                  <ArgonInput 
-                    placeholder="Search and select..." 
-                    readOnly 
-                    value={searchTerm} 
-                    sx={{ borderRadius: 1, borderColor: 'grey.500', minWidth: 200 }} // Styling the input
-                  />
-                  <Icon>arrow_drop_down</Icon>
-                </IconButton>
-              )} */}
-
-              {/* <Link to="/authentication/sign-in/basic">
-                <IconButton sx={navbarIconButton} size="small">
-                  <Icon
-                    sx={({ palette: { dark, white } }) => ({
-                      color: light && transparentNavbar ? white.main : dark.main,
-                    })}
-                  >
-                    account_circle
-                  </Icon>
-                  <ArgonTypography
-                    variant="button"
-                    fontWeight="medium"
-                    color={light && transparentNavbar ? "white" : "dark"}
-                  >
-                    Sign in
-                  </ArgonTypography>
-                </IconButton>
-              </Link> */}
-
               <IconButton
                 size="small"
                 color={light && transparentNavbar ? "white" : "dark"}
@@ -238,16 +197,41 @@ function DashboardNavbar({ absolute, light, isMini, showButton, dropdownOptions 
                 <Icon>settings</Icon>
               </IconButton>
               <IconButton
-                size="small"
-                color={light && transparentNavbar ? "white" : "dark"}
-                sx={navbarIconButton}
-                aria-controls="notification-menu"
-                aria-haspopup="true"
-                variant="contained"
-                onClick={handleOpenMenu}
-              >
-                <Icon>notifications</Icon>
-              </IconButton>
+  size="small"
+  color={light && transparentNavbar ? "white" : "dark"}
+  sx={navbarIconButton}
+  aria-controls="notification-menu"
+  aria-haspopup="true"
+  variant="contained"
+  onClick={handleOpenMenu}
+>
+  <Badge
+    badgeContent={Object.keys(vesselEntries).length}
+    // color="secondary"
+    sx={{
+      "& .MuiBadge-dot": {
+        backgroundColor: light ? "white" : "black",
+      },
+      "& .MuiBadge-badge": {
+        right: 0, // Adjust badge position horizontally
+        top: -3, // Adjust badge position vertically
+        padding: '0 4px', // Smaller padding
+        fontSize: '0.75rem', // Smaller font size
+        minWidth: '16px', // Smaller minimum width
+        height: '16px', // Smaller height
+        borderRadius: '50%', // Fully rounded badge
+        display: 'flex', // Center text horizontally and vertically
+        alignItems: 'center', // Center text vertically
+        justifyContent: 'center', // Center text horizontally
+        backgroundColor:'red'
+      },
+    }}
+  >
+    <Icon>notifications</Icon>
+  </Badge>
+</IconButton>
+
+
             </ArgonBox>
           </ArgonBox>
         )}
@@ -264,6 +248,7 @@ DashboardNavbar.defaultProps = {
   isMini: false,
   showButton: false,
   dropdownOptions: [],
+  vesselEntries: [],
 };
 
 DashboardNavbar.propTypes = {
@@ -272,6 +257,7 @@ DashboardNavbar.propTypes = {
   isMini: PropTypes.bool,
   showButton: PropTypes.bool,
   dropdownOptions: PropTypes.arrayOf(PropTypes.string),
+  vesselEntries: PropTypes.arrayOf(PropTypes.object), // Add prop validation for notifications
 };
 
 export default DashboardNavbar;

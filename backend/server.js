@@ -34,37 +34,6 @@ const transporter = nodemailer.createTransport({
 });
 
 
-// Define Schema and Model
-const crossingSchema = new mongoose.Schema({
-    vesselName: String,
-    geofenceName: String,
-    timestamp: Date,
-  });
-  
-  const Crossing = mongoose.model('Crossing', crossingSchema);
-  
-  // Endpoint to save crossing data
-  app.post('/api/save-crossing-data', async (req, res) => {
-    try {
-      const { vesselName, geofenceName, timestamp } = req.body;
-      const newCrossing = new Crossing({ vesselName, geofenceName, timestamp });
-      await newCrossing.save();
-      res.status(200).json({ message: 'Crossing data saved successfully' });
-    } catch (error) {
-      res.status(500).json({ error: 'Error saving crossing data' });
-    }
-  });
-  
-  // Endpoint to fetch crossing data
-  app.get('/api/get-crossing-data', async (req, res) => {
-    try {
-      const crossings = await Crossing.find({});
-      res.status(200).json(crossings);
-    } catch (error) {
-      res.status(500).json({ error: 'Error fetching crossing data' });
-    }
-  });
-
 // Define Mongoose schema and model for vessel_master collection
 const vesselSchema = new mongoose.Schema({
     imoNumber: Number,
@@ -116,6 +85,7 @@ vesselSchema.index({ transportName: 'text' });
 
 const Vessel = mongoose.model('vessel_master', vesselSchema, 'vessel_master');
 
+
 // Define Mongoose schema and model for vesselstrackeds collection
 const trackedVesselSchema = new mongoose.Schema({
     AIS: {
@@ -150,72 +120,63 @@ const trackedVesselSchema = new mongoose.Schema({
     FLAG: String,
     GrossTonnage: Number,
     deadWeight: Number,
-
+    geofenceFlag: String, // Add this field
 }, { timestamps: true });
 
 const TrackedVessel = mongoose.model('vesselstrackeds', trackedVesselSchema, 'vesselstrackeds');
 
+
+// Define Geofence schema
 const geofenceSchema = new mongoose.Schema({
+    geofenceId: String,
     geofenceName: String,
-    geofenceId: String, // Updated to match frontend
-    geofenceType: { type: String, enum: ['global', 'vessel', 'port'] },
-    date: { type: Date, default: Date.now, immutable: true },
+    geofenceType: String,
+    date: Date,
     remarks: String,
-    coordinates: {
-        type: [[[Number]]], // Array of arrays of arrays of numbers
-        validate: {
-            validator: function (v) {
-                // Ensure that the coordinates are in the correct format
-                return v.every(arr => Array.isArray(arr) && arr.every(coord => Array.isArray(coord) && coord.length === 2 && coord.every(num => typeof num === 'number')));
-            },
-            message: 'Coordinates must be an array of arrays of arrays of numbers'
-        }
-    }
+    coordinates: [{ lat: Number, lng: Number, radius: Number }]
 });
 
+const Geofence = mongoose.model('Geofence', geofenceSchema);
 
-const Geofence = mongoose.model('geofences', geofenceSchema, 'geofences');
+app.post('/api/addcirclegeofences', async (req, res) => {
+    console.log('Received Circle Geofence:', req.body); // Add logging
+    const { geofenceId, geofenceName, geofenceType, date, remarks, coordinates } = req.body;
 
-app.post('/api/add-geofence', async (req, res) => {
+    // Perform additional checks if needed
+    if (!coordinates || coordinates.length === 0 || coordinates[0].radius <= 0) {
+        return res.status(400).json({ error: 'Invalid coordinates or radius.' });
+    }
+
+    const geofence = new Geofence({
+        geofenceId,
+        geofenceName,
+        geofenceType,
+        date,
+        remarks,
+        coordinates: coordinates.map(coord => ({ lat: coord.lat, lng: coord.lng, radius: coord.radius })),
+    });
+
     try {
-        const { geofenceName, geofenceId, geofenceType, date, remarks, coordinates } = req.body;
-        console.log(req.body);
-
-        // Convert coordinates from { lat, lng } to [lng, lat] format
-        const formattedCoordinates = coordinates.map(coord => [coord.lng, coord.lat]);
-
-        const newGeofence = new Geofence({
-            geofenceName,
-            geofenceId, // Updated to match schema
-            geofenceType,
-            date,
-            remarks,
-            coordinates: [formattedCoordinates] // Wrap in an extra array if needed
-        });
-
-        await newGeofence.save();
-        res.status(201).json({ message: 'Geofence data saved successfully' });
+        await geofence.save();
+        res.status(201).json({ message: 'Circle geofence saved successfully!' });
     } catch (error) {
-        console.error('Error adding geofence data:', error);
-        res.status(500).json({ error: 'Error adding geofence data' });
+        console.error('Error saving geofence:', error); // Log the error
+        res.status(500).json({ error: error.message });
     }
 });
 
-
-
-
-
-// Route to get all geofences
-app.get('/api/geofences', async (req, res) => {
+// Endpoint to retrieve all circle geofences
+app.get('/api/circlegeofences', async (req, res) => {
     try {
-        const geofences = await Geofence.find();
+        const geofences = await Geofence.find(); // Adjust if necessary
         res.status(200).json(geofences);
     } catch (error) {
-        console.error('Error fetching geofences:', error);
-        res.status(500).json({ error: 'Error fetching geofences' });
+        console.error('Error fetching circle geofences:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 
+;
 
 const PolygonGeofenceSchema = new mongoose.Schema({
     geofenceId: String,
@@ -226,32 +187,36 @@ const PolygonGeofenceSchema = new mongoose.Schema({
     coordinates: Array,
     
   });
+
+const PolygonGeofence = mongoose.model('PolygonGeofence', PolygonGeofenceSchema);
   
-  const PolygonGeofence = mongoose.model('PolygonGeofence', PolygonGeofenceSchema);
-  
- // Example POST endpoint for saving polygon geofences
+// Example POST endpoint for saving polygon geofences
 app.post('/api/addpolygongeofences', async (req, res) => {
     const { geofenceId, geofenceName, geofenceType, date, remarks, coordinates } = req.body;
   
-    try {
-      const newGeofence = new PolygonGeofence({
-        geofenceId,
-        geofenceName,
-        geofenceType,
-        date,
-        remarks,
-        coordinates,
-      });
+    if (!Array.isArray(coordinates) || coordinates.length === 0) {
+      return res.status(400).json({ error: 'Coordinates are required and should be an array.' });
+    }
   
-      await newGeofence.save();
-      res.status(201).json(newGeofence);
+    const newGeofence = new PolygonGeofence({
+      geofenceId,
+      geofenceName,
+      geofenceType,
+      date,
+      remarks,
+      coordinates,
+    });
+  
+    try {
+      const savedGeofence = await newGeofence.save();
+      res.status(201).json(savedGeofence);
     } catch (error) {
       console.error('Error saving geofence:', error);
       res.status(500).json({ error: 'Failed to save geofence data.' });
     }
   });
   
-
+  
   
   // API to fetch polygon geofences
   app.get('/api/polygongeofences', async (req, res) => {
@@ -264,7 +229,67 @@ app.post('/api/addpolygongeofences', async (req, res) => {
     }
   });
 
-app.post('/api/add-combined-data', async (req, res) => {
+  const PolylineGeofenceSchema = new mongoose.Schema({
+    geofenceId: String,
+    geofenceName: String,
+    geofenceType: String,
+    date: String,
+    remarks: String,
+    coordinates: Array,
+});
+
+const PolylineGeofence = mongoose.model('PolylineGeofence', PolylineGeofenceSchema);
+
+// Example POST endpoint for saving polyline geofences
+app.post('/api/addpolylinegeofences', async (req, res) => {
+    const { geofenceId, geofenceName, geofenceType, date, remarks, coordinates } = req.body;
+    console.log('Received polyline geofence data:', req.body);
+    try {
+        const newPolylineGeofence = new PolylineGeofence({
+            geofenceId,
+            geofenceName,
+            geofenceType,
+            date,
+            remarks,
+            coordinates,
+        });
+
+        await newPolylineGeofence.save();
+        res.status(201).json(newPolylineGeofence);
+    } catch (error) {
+        console.error('Error saving polyline geofence:', error);
+        res.status(500).json({ error: 'Failed to save polyline geofence data.' });
+    }
+});
+
+// Route to get all polyline geofences
+app.get('/api/polylinegeofences', async (req, res) => {
+    try {
+        const polylineGeofences = await PolylineGeofence.find();
+        res.status(200).json(polylineGeofences);
+    } catch (error) {
+        console.error('Error fetching polyline geofences:', error);
+        res.status(500).json({ error: 'Error fetching polyline geofences' });
+    }
+});
+
+// Example DELETE endpoint for removing a polyline geofence by ID
+app.delete('/api/polylinegeofences/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const deletedGeofence = await PolylineGeofence.findByIdAndDelete(id);
+        if (!deletedGeofence) {
+            return res.status(404).json({ error: 'Geofence not found' });
+        }
+        res.status(200).json({ message: 'Geofence deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting polyline geofence:', error);
+        res.status(500).json({ error: 'Error deleting polyline geofence' });
+    }
+});
+
+
+  app.post('/api/add-combined-data', async (req, res) => {
     try {
         console.log('Combined Data Request Body:', req.body); // Log the request body
 
@@ -326,8 +351,7 @@ HYLA Admin
         console.error('Error adding combined data:', error);
         res.status(500).json({ error: 'Error adding combined data' });
     }
-});
-
+  });
 
 // Route to fetch specific fields from vesselstrackeds collection
 app.get('/api/get-tracked-vessels', async (req, res) => {
@@ -405,7 +429,8 @@ app.get('/api/ais-data', async (req, res) => {
 // VTExplorer API details
 const userkey = 'WS-096EE673-456A8B'; // Your VTExplorer API key
 
-// Function to check and update vessel data
+
+
 async function checkAndUpdateVesselData() {
     try {
         const vessels = await TrackedVessel.find(); // Get all vessels from the database
@@ -426,13 +451,19 @@ async function checkAndUpdateVesselData() {
             const apiData = response.data[0]?.AIS;
 
             // Check if latitude or longitude has changed
-            const updatedFields = {};
             if (apiData && (apiData.LATITUDE !== vessel.AIS.LATITUDE || apiData.LONGITUDE !== vessel.AIS.LONGITUDE)) {
-                updatedFields['AIS.LATITUDE'] = apiData.LATITUDE;
-                updatedFields['AIS.LONGITUDE'] = apiData.LONGITUDE;
-
                 // Update MongoDB document
-                await TrackedVessel.updateOne({ _id: vessel._id }, { $set: updatedFields });
+                const updatedFields = {
+                    'AIS.LATITUDE': apiData.LATITUDE,
+                    'AIS.LONGITUDE': apiData.LONGITUDE
+                };
+
+                // Call the endpoint to update vessel location and save history
+                await axios.put(`http://localhost:5000/api/updateVesselLocation/${vessel._id}`, {
+                    LATITUDE: apiData.LATITUDE,
+                    LONGITUDE: apiData.LONGITUDE,
+                    TIMESTAMP: new Date().toISOString()
+                });
 
                 // Log the update
                 console.log(`Vessel ${vessel.AIS.NAME} (IMO: ${imo}) updated:`, updatedFields);
@@ -443,12 +474,156 @@ async function checkAndUpdateVesselData() {
     }
 }
 
+// setInterval(checkAndUpdateVesselData, 60 * 100000); 
 
-setInterval(checkAndUpdateVesselData, 60 * 10000); 
+
+// Define the VesselHistory schema
+const vesselHistorySchema = new mongoose.Schema({
+    vesselId: { type: mongoose.Schema.Types.ObjectId, ref: 'TrackedVessel', required: true },
+    vesselName: String,
+    IMO: Number,
+    history: [{
+        LATITUDE: Number,
+        LONGITUDE: Number,
+        TIMESTAMP: String,
+        geofenceFlag: { type: String, default: null },
+    }],
+    updatedAt: { type: Date, default: Date.now }
+});
+
+const VesselHistory = mongoose.model('VesselHistory', vesselHistorySchema, 'vesselHistories');
+
+// Update vessel location and save history
+app.put('/api/updateVesselLocation/:id', async (req, res) => {
+    const { LATITUDE, LONGITUDE, TIMESTAMP } = req.body;
+    const vesselId = req.params.id;
+
+    try {
+        if (!vesselId || !mongoose.isValidObjectId(vesselId)) {
+            return res.status(400).json({ error: 'Invalid vessel ID' });
+        }
+
+        const vessel = await TrackedVessel.findById(vesselId);
+        
+        if (vessel) {
+            const previousLocation = {
+                LATITUDE: vessel.AIS.LATITUDE,
+                LONGITUDE: vessel.AIS.LONGITUDE,
+                TIMESTAMP: vessel.AIS.TIMESTAMP
+            };
+
+            let historyEntry = await VesselHistory.findOne({ vesselId: vessel._id });
+
+            if (!historyEntry) {
+                historyEntry = new VesselHistory({
+                    vesselId: vessel._id,
+                    vesselName: vessel.AIS.NAME,
+                    IMO: vessel.AIS.IMO,
+                    history: [previousLocation]
+                });
+            } else {
+                historyEntry.history.push(previousLocation);
+            }
+
+            await historyEntry.save();
+
+            vessel.AIS.LATITUDE = LATITUDE;
+            vessel.AIS.LONGITUDE = LONGITUDE;
+            vessel.AIS.TIMESTAMP = TIMESTAMP;
+            
+            await vessel.save();
+            
+            res.status(200).json({ message: 'Vessel location updated and history saved' });
+        } else {
+            res.status(404).json({ error: 'Vessel not found' });
+        }
+    } catch (error) {
+        console.error('Error updating vessel location:', error);
+        res.status(500).json({ error: 'Failed to update vessel location' });
+    }
+});
+
+// Save vessel history
+app.post('/api/vesselHistory/:id', async (req, res) => {
+    const { LATITUDE, LONGITUDE, TIMESTAMP } = req.body;
+    const vesselId = req.params.id;
+
+    try {
+        if (!vesselId || !mongoose.isValidObjectId(vesselId)) {
+            return res.status(400).json({ error: 'Invalid vessel ID' });
+        }
+
+        let historyEntry = await VesselHistory.findOne({ vesselId });
+
+        const geofenceFlag = req.body.geofenceFlag || null; // Get geofenceFlag from request body
+
+        if (!historyEntry) {
+            historyEntry = new VesselHistory({
+                vesselId,
+                history: [{ LATITUDE, LONGITUDE, TIMESTAMP, geofenceFlag }]
+            });
+        } else {
+            historyEntry.history.push({ LATITUDE, LONGITUDE, TIMESTAMP, geofenceFlag });
+        }
+
+        await historyEntry.save();
+        res.status(200).json({ message: 'History saved' });
+    } catch (error) {
+        console.error('Error saving vessel history:', error);
+        res.status(500).json({ error: 'Failed to save history' });
+    }
+});
+
+
+// Get vessel history by vessel ID
+app.get('/api/getvesselHistory/:id', async (req, res) => {
+    const vesselId = req.params.id;
+
+    try {
+        if (!vesselId || !mongoose.isValidObjectId(vesselId)) {
+            return res.status(400).json({ error: 'Invalid vessel ID' });
+        }
+
+        const historyEntry = await VesselHistory.findOne({ vesselId });
+
+        if (!historyEntry) {
+            return res.status(404).json({ error: 'History not found for this vessel' });
+        }
+
+        res.status(200).json(historyEntry);
+    } catch (error) {
+        console.error('Error retrieving vessel history:', error);
+        res.status(500).json({ error: 'Failed to retrieve vessel history' });
+    }
+});
+
+app.put('/api/updateVesselFlag/:id', async (req, res) => {
+    const { geofenceFlag } = req.body;
+    const vesselId = req.params.id;
+
+    try {
+        if (!vesselId || !mongoose.isValidObjectId(vesselId)) {
+            return res.status(400).json({ error: 'Invalid vessel ID' });
+        }
+
+        const vessel = await TrackedVessel.findById(vesselId);
+        if (vessel) {
+            vessel.geofenceFlag = geofenceFlag; // Update the geofenceFlag field
+            await vessel.save();
+            res.status(200).json({ message: 'Geofence flag updated successfully' });
+        } else {
+            res.status(404).json({ error: 'Vessel not found' });
+        }
+    } catch (error) {
+        console.error('Error updating geofence flag:', error);
+        res.status(500).json({ error: 'Failed to update geofence flag' });
+    }
+});
+
 
 // Start the server and listen on the specified port
-app.listen(port,'104.225.218.43', () => {
-    console.log(`Server running on http://104.225.218.43:${port}`);
+app.listen(port,'0.0.0.0', () => {
+    console.log(`Server running on http://0.0.0.0:${port}`);
 });
 
 

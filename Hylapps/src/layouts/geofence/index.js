@@ -8,27 +8,19 @@ import DashboardLayout from "examples/LayoutContainers/DashboardLayout";
 import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 import Footer from "examples/Footer";
 import MyMapComponent from "./MyMapComponent";
-import VesselDetailsTable from "./VesselDetailsTable";
 import GeofenceMessage from "./GeofenceMessage";
 
 function Geofence() {
   const [vessels, setVessels] = useState([]);
-  const [error, setError] = useState(null);
   const [selectedVessel, setSelectedVessel] = useState(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [highlightRow, setHighlightRow] = useState(null);
-  const [destinationOptions, setDestinationOptions] = useState([]);
-
-  const handleRefreshTable = () => {
-    setRefreshKey((prevKey) => prevKey + 1);
-  };
-
-  const handleRowHighlight = (vessel) => {
-    setHighlightRow(vessel);
-  };
+  const [vesselEntries, setVesselEntries] = useState({});
+  const [notifications, setNotifications] = useState([]);
 
   const handleRowClick = (vessel) => {
-    setSelectedVessel(vessel);
+    const selected = vessels.find(v => v.name === vessel.vesselName);
+    if (selected) {
+      setSelectedVessel(selected); // Set the vessel for zoom
+    }
   };
 
   const calculateMapCenter = () => {
@@ -38,97 +30,71 @@ function Geofence() {
     return [latSum / vessels.length, lngSum / vessels.length];
   };
 
-  const vesselsToDisplay = selectedVessel ? [selectedVessel] : vessels;
   const center = selectedVessel ? [selectedVessel.lat, selectedVessel.lng] : calculateMapCenter();
-  const zoom = selectedVessel ? 10 : 6; // Adjust zoom level
+  const zoom = selectedVessel ? 10 : 6;
 
   useEffect(() => {
-    axios
-      .get("http://localhost:5000/api/get-tracked-vessels")
+    axios.get("http://localhost:5000/api/get-tracked-vessels")
       .then((response) => {
         const formattedData = response.data.map((vessel) => ({
           name: vessel.AIS.NAME || "",
-          imo: Number(vessel.AIS.IMO) || 0,
           lat: Number(vessel.AIS.LATITUDE) || 0,
           lng: Number(vessel.AIS.LONGITUDE) || 0,
           heading: vessel.AIS.HEADING || 0,
-          status: vessel.AIS.NAVSTAT || 0,
-          eta: vessel.AIS.ETA || 0,
-          destination: vessel.AIS.DESTINATION || 0,
+          destination: vessel.AIS.DESTINATION || "",
+          speed: vessel.AIS.SPEED || 0,
         }));
-
-        const destinations = [...new Set(formattedData.map((vessel) => vessel.destination))];
-        setDestinationOptions(destinations);
         setVessels(formattedData);
       })
       .catch((err) => {
         console.error("Error fetching vessel data:", err);
-        setError(err.message);
       });
   }, []);
 
+  // Add notifications when vessels enter geofences
+  const handleNewGeofenceEntry = (message) => {
+    setNotifications((prev) => [
+      ...prev,
+      {
+        title: message.title,
+        date: new Date().toLocaleTimeString(),
+        image: <img src={team2} alt="vessel" />,
+      }
+    ]);
+  };
+
   return (
     <DashboardLayout>
-      <DashboardNavbar showButton={true} dropdownOptions={destinationOptions} />
+      <DashboardNavbar vesselEntries={vesselEntries}/>
       <ArgonBox py={3}>
         <Grid container spacing={3}>
           <Grid item xs={12}>
-            <Card
-              sx={{
-                backgroundColor: "#ffffff",
-                borderRadius: "17px",
-                boxShadow: 1,
-                padding: 2,
-                height: "550px",
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              <CardContent
-                sx={{
-                  backgroundColor: "#ffffff",
-                  padding: 0,
-                  height: "100%",
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
+            <Card sx={{ height: "550px" }}>
+              <CardContent>
                 <MyMapComponent
                   zoom={zoom}
                   center={center}
-                  vessels={vesselsToDisplay}
+                  vessels={vessels}
                   selectedVessel={selectedVessel}
+                  setVesselEntries={setVesselEntries}
+                  onNewGeofenceEntry={handleNewGeofenceEntry} // Handle geofence entries
                 />
               </CardContent>
             </Card>
           </Grid>
         </Grid>
-
         <Grid container spacing={3} mt={1}>
-          <Grid item xs={12} md={6}>
-            <Card
-              sx={{
-                backgroundColor: "#ffffff",
-                borderRadius: "17px",
-                boxShadow: 1,
-                padding: 2,
-                height: "550px",
-              }}
-            >
-              <CardContent
-                sx={{
-                  backgroundColor: "#ffffff",
-                  padding: 0,
-                  height: "100%",
-                }}
-              >
-                <GeofenceMessage />
+          <Grid item xs={12}>
+            <Card sx={{ height: "550px" }}>
+              <CardContent>
+                <GeofenceMessage
+                  vesselEntries={vesselEntries}
+                  vessels={vessels}
+                  onRowClick={handleRowClick}
+                />
               </CardContent>
             </Card>
           </Grid>
-
-         
         </Grid>
       </ArgonBox>
       <Footer />
@@ -137,3 +103,7 @@ function Geofence() {
 }
 
 export default Geofence;
+
+
+
+

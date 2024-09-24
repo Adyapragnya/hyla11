@@ -28,19 +28,14 @@ function menuItem(theme) {
 }
 
 function menuImage(theme, ownerState) {
-  const { functions, palette, borders } = theme;
-  const { color } = ownerState;
-
-  const { linearGradient } = functions;
-  const { gradients } = palette;
+  const { functions, borders } = theme;
   const { borderRadius } = borders;
 
   return {
     display: "grid",
     placeItems: "center",
-    backgroundImage: gradients[color]
-      ? linearGradient(gradients[color].main, gradients[color].state)
-      : linearGradient(gradients.dark.main, gradients.dark.state),
+    // Set background color to yellow
+    backgroundColor: 'lightgrey',
 
     "& img": {
       width: "100%",
@@ -49,4 +44,6 @@ function menuImage(theme, ownerState) {
   };
 }
 
+
 export { menuItem, menuImage };
+

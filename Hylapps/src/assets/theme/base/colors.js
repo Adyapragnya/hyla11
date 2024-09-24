@@ -51,8 +51,8 @@ const colors = {
   },
 
   secondary: {
-    main: "#0F67B1",
-    focus: "#0F67B1",
+    main: "#adb5bd",
+    focus: "#adb5bd",
   },
 
   info: {
@@ -104,8 +104,8 @@ const colors = {
     },
 
     secondary: {
-      main: "#0F67B1",
-      state: "#0F67B1",
+      main: "#adb5bd",
+      state: "#adb5bd",
     },
 
     info: {
@@ -209,8 +209,8 @@ const colors = {
     },
 
     secondary: {
-      main: "#627594",
-      state: "#8ca1cb",
+      main: "#adb5bd",
+      state: "#adb5bd",
       border: "#dadee6",
     },
 
@@ -258,7 +258,7 @@ const colors = {
     },
 
     secondary: {
-      background: "#e4e8ed",
+      background: "#adb5bd",
       text: "#5974a2",
     },
 
